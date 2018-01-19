@@ -95,6 +95,7 @@ int get_args(const char* cmd , char** args)
 
     char delim[] = " ,!";
     int count = 0;
+
 #if defined(__linux__)
 // Linux系统 使用效率更高的strsep
     char* buf = strdup(cmd);//复制一份cmd作为buf，后面用strsep会修改该值
@@ -106,6 +107,8 @@ int get_args(const char* cmd , char** args)
         if(token != NULL && strlen(token) == 0){
             continue;
         }
+        args[count] = token;//strdup(token);
+        count++;
         printf(token);
         printf("+");
     }
