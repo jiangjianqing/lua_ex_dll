@@ -4,7 +4,19 @@
 #include "uv.h"
 #include <string>
 #include <thread>
+
+#if defined(__linux__)
+// Linux系统
+#include "boost/filesystem.hpp"
+using namespace boost::filesystem;
+#elif defined(_WIN32)
+
+// Windows系统
 #include <filesystem>
+using namespace std::tr2::sys;
+#endif
+
+
 
 using namespace std;
 
@@ -29,8 +41,8 @@ int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
     options.args = (char**)args;
     options.file = args[0]; //特别注意：file和args的第一个参数相同
 
-    std::tr2::sys::path myfile(options.file);
-    if (std::tr2::sys::exists(myfile)) {
+    path myfile(options.file);  //vc2015 std::tr2::sys::path
+    if (exists(myfile)) {
         //printf(myfile.path.c_str());
 
         string tmp = myfile.parent_path().string();
