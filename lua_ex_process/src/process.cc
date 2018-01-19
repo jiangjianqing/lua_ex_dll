@@ -104,7 +104,7 @@ static int kill_by_name(lua_State *L)
     */
     char cmd_buf[1024]={0};
 #if defined(__linux__)
-
+    //linux下是否由能够按名称杀进程的命令还需要查阅资料
 #elif defined(_WIN32)
 // Windows 使用 tasklist \ taskkill完成杀进程操作
     sprintf(cmd_buf,"taskkill /im %s -f",process_file_name);
