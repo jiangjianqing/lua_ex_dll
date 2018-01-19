@@ -17,7 +17,6 @@ using namespace std::tr2::sys;
 #endif
 
 using namespace std;
-namespace fs = std::experimental::filesystem;
 
 //命令行最大参数个数
 #define MAX_ARG_COUNT 100
@@ -101,7 +100,12 @@ void CopyFiles(const path &src, const path &dst)
         }
         else if (is_regular_file(newSrc))
         {
+            //ps:linux boost & vc 2015 found difference.
+#if defined(__linux__)
+            copy_file(newSrc, newDst, copy_option::overwrite_if_exists);
+#elif defined(_WIN32)
             copy_file(newSrc, newDst, copy_options::overwrite_existing);
+#endif
         }
         else
         {
