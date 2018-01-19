@@ -3,8 +3,13 @@
 #include <math.h>
 #include "uv.h"
 #include <string>
+#include <thread>
+#include <filesystem>
 
 using namespace std;
+
+//命令行最大参数个数
+#define MAX_ARG_COUNT 100
 
 static int64_t process_exit_status = -1;
 void on_exit(uv_process_t *req, int64_t exit_status, int term_signal)
@@ -14,7 +19,7 @@ void on_exit(uv_process_t *req, int64_t exit_status, int term_signal)
     uv_close((uv_handle_t*) req, NULL);
 }
 
-int exec_shell(const char** args,uv_exit_cb exit_cb)
+int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
 {
     uv_loop_t* loop = uv_default_loop();
     uv_process_t child_req;
@@ -23,6 +28,18 @@ int exec_shell(const char** args,uv_exit_cb exit_cb)
     options.exit_cb = exit_cb;
     options.args = (char**)args;
     options.file = args[0]; //特别注意：file和args的第一个参数相同
+
+    std::tr2::sys::path myfile(options.file);
+    if (std::tr2::sys::exists(myfile)) {
+        //printf(myfile.path.c_str());
+
+        string tmp = myfile.parent_path().string();
+        options.cwd = strdup(tmp.c_str());
+        printf(tmp.c_str());
+    }
+    if(!is_sync_exec){//注：异步执行时让child_process和parent detach
+        options.flags = UV_PROCESS_DETACHED;
+    }
 
     int iret = 0;
     iret = uv_spawn(loop,&child_req, &options);
@@ -35,11 +52,21 @@ int exec_shell(const char** args,uv_exit_cb exit_cb)
         fprintf(stderr, "Launched process with ID %d\n", child_req.pid);
     }
 
-    iret = uv_run(loop, UV_RUN_DEFAULT);
-    if(process_exit_status == 128){
-        //没有该名称的进程
-        iret = -1;
+    if(!is_sync_exec){
+        uv_run(loop, UV_RUN_NOWAIT);
+        //thread t{[&loop](){//obsoloted : 用thread异步不好，改用 UV_RUN_NOWAIT + options.flags = UV_PROCESS_DETACHED
+
+        //}};
+
+    }else{//sync exec
+        iret = uv_run(loop, UV_RUN_DEFAULT);
+        if(process_exit_status == 128){
+            //没有该名称的进程
+            iret = -1;
+        }
     }
+
+
     return iret;
 }
 
@@ -94,7 +121,7 @@ static int kill_by_name(lua_State *L)
 
     char* cmd_name = (char*)"taskkill";
 
-    char* args[100];
+    char* args[MAX_ARG_COUNT] = {0};
     /*
     args[0] = cmd_name;
     args[1] = (char*)"/im";
@@ -108,20 +135,38 @@ static int kill_by_name(lua_State *L)
 #elif defined(_WIN32)
 // Windows 使用 tasklist \ taskkill完成杀进程操作
     sprintf(cmd_buf,"taskkill /im %s -f",process_file_name);
+
+    //强制杀死PID为processid的进程，PID可通过tasklist查看
+    //taskkill /pid processid -f
 #endif
     get_args(cmd_buf,args);
 
-    int iret = exec_shell((const char**)args,on_exit);
+    int iret = exec_shell((const char**)args,on_exit,true);
 
-    lua_pushnumber(L, iret);
+    lua_pushnumber(L , iret);
     return 1;
 }
 
-
-
 static int exec(lua_State *L)
 {
-    return 0;
+    const char* cmd = luaL_checkstring(L,1);
+    char* args[MAX_ARG_COUNT] = {0};
+    get_args(cmd , args);
+
+    int iret = exec_shell((const char**)args,on_exit,true);
+    lua_pushnumber(L , iret);
+    return 1;
+}
+
+static int async_exec(lua_State *L)
+{
+    const char* cmd = luaL_checkstring(L,1);
+    char* args[MAX_ARG_COUNT] = {0};
+    get_args(cmd , args);
+
+    int iret = exec_shell((const char**)args,on_exit,false);
+    lua_pushnumber(L , iret);
+    return 1;
 }
 
 static int my_math_sin (lua_State *L) {
@@ -159,6 +204,8 @@ static int sayHelloFunc(lua_State* L)
 static const struct luaL_Reg myLib[] =
 {
     {"kill_by_name",kill_by_name},
+    {"exec",exec},
+    {"async_exec",async_exec},
     {"average", averageFunc},
     {"sayHello", sayHelloFunc},
     {"my_cos",   my_math_cos},
