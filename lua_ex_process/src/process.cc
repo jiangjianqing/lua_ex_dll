@@ -2,6 +2,7 @@
 #include "main.h"
 #include <math.h>
 #include "uv.h"
+#include <string>
 
 using namespace std;
 
@@ -13,34 +14,22 @@ void on_exit(uv_process_t *req, int64_t exit_status, int term_signal)
     uv_close((uv_handle_t*) req, NULL);
 }
 
-static int kill_by_name(lua_State *L)
+int exec_shell(const char** args,uv_exit_cb exit_cb)
 {
     uv_loop_t* loop = uv_default_loop();
     uv_process_t child_req;
 
-    //const char* process_file_name = luaL_checkstring(L,1);
-
-    char* cmd_name = (char*)"taskkill";
-
-    char* args[5];
-    args[0] = cmd_name;
-    args[1] = (char*)"/im";
-    args[2] = (char*)"FSMachineVision_64WT.exe";
-    args[3] = (char*)"-f";
-    args[4] = NULL;
-
-
     uv_process_options_t options = {0}; // If change options to a local variable, remember to initialize it to null out all unused fields:
-    options.exit_cb = on_exit;
-    options.args = args;
-    options.file = cmd_name;
+    options.exit_cb = exit_cb;
+    options.args = (char**)args;
+    options.file = args[0]; //特别注意：file和args的第一个参数相同
 
     int iret = 0;
     iret = uv_spawn(loop,&child_req, &options);
 
     if (iret) {
         fprintf(stderr, "%s\n", uv_strerror(iret));
-        lua_pushnumber(L, 1);
+        //lua_pushnumber(L, 1);
         return 1;
     } else {
         fprintf(stderr, "Launched process with ID %d\n", child_req.pid);
@@ -49,11 +38,86 @@ static int kill_by_name(lua_State *L)
     iret = uv_run(loop, UV_RUN_DEFAULT);
     if(process_exit_status == 128){
         //没有该名称的进程
-        iret = 1;
+        iret = -1;
     }
+    return iret;
+}
+
+/**
+ * @brief get_args
+ * @param cmd 指令字符串 注：目前不支持 管道 操作
+ * @param args 生成分割好的字符串列表，由外部分配好内存
+ * @return
+ */
+int get_args(const char* cmd , char** args)
+{
+
+    char *token = NULL;
+
+    char delim[] = " ,!";
+    int count = 0;
+#if defined(__linux__)
+// Linux系统 使用效率更高的strsep
+    char* buf = strdup(cmd);//复制一份cmd作为buf，后面用strsep会修改该值
+    for(token = strsep(&buf, delim); token != NULL; token = strsep(&buf, delim)) {
+        //One difference between strsep and strtok_r is that if the input string contains more
+        //than one character from delimiter in a row strsep returns an empty string for each
+        //pair of characters from delimiter. This means that a program normally should test
+        //for strsep returning an empty string before processing it.
+        if(token != NULL && strlen(token) == 0){
+            continue;
+        }
+        printf(token);
+        printf("+");
+    }
+
+#elif defined(_WIN32)
+// Windows vc 没有strsep，所以任然使用strtok代替
+//#define LUA_API extern "C" __declspec(dllexport)
+    char* buf = (char*)cmd;
+    for(token = strtok(buf, delim); token != NULL; token = strtok(NULL, delim)) {
+        args[count] = token;//strdup(token);
+        printf(token);
+        printf("+");
+        count++;
+    }
+#endif
+
+    args[count] = NULL;
+
+    return count;
+}
+
+static int kill_by_name(lua_State *L)
+{
+    const char* process_file_name = luaL_checkstring(L,1);
+
+    char* cmd_name = (char*)"taskkill";
+
+    char* args[100];
+    /*
+    args[0] = cmd_name;
+    args[1] = (char*)"/im";
+    args[2] = (char*)process_file_name;
+    args[3] = (char*)"-f";
+    args[4] = NULL;
+    */
+    char cmd_buf[1024]={0};
+#if defined(__linux__)
+
+#elif defined(_WIN32)
+// Windows 使用 tasklist \ taskkill完成杀进程操作
+    sprintf(cmd_buf,"taskkill /im %s -f",process_file_name);
+#endif
+    get_args(cmd_buf,args);
+
+    int iret = exec_shell((const char**)args,on_exit);
+
     lua_pushnumber(L, iret);
     return 1;
 }
+
+
 
 static int exec(lua_State *L)
 {
