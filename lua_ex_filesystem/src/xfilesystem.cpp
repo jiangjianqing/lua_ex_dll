@@ -17,6 +17,7 @@ using namespace std::tr2::sys;
 #endif
 
 using namespace std;
+namespace fs = std::experimental::filesystem;
 
 //命令行最大参数个数
 #define MAX_ARG_COUNT 100
@@ -84,9 +85,47 @@ static int rm_rf(lua_State *L)
     return 1;
 }
 
+void CopyFiles(const path &src, const path &dst)
+{
+    if (! exists(dst))
+    {
+        create_directories(dst);
+    }
+    for(directory_iterator it(src); it != directory_iterator(); ++it){
+
+        const path newSrc = src / it->path().filename();
+        const path newDst = dst / it->path().filename();
+        if (is_directory(newSrc))
+        {
+            CopyFiles(newSrc, newDst);
+        }
+        else if (is_regular_file(newSrc))
+        {
+            copy_file(newSrc, newDst, copy_options::overwrite_existing);
+        }
+        else
+        {
+            fprintf(stderr, "Error: unrecognized file - %s", newSrc.string().c_str());
+        }
+    }
+}
+
 static int cp_rf(lua_State *L)
 {
-    return 0;
+    const char* source = luaL_checkstring(L,1);
+    const char* dest = luaL_checkstring(L,2);
+    fprintf(stdout,"source = %s , dest = %s \r\n",source,dest);
+    int iret = 0;
+    if(exists(source)){
+        try{
+            CopyFiles(source,dest);
+        }catch(const filesystem_error& e){
+            fprintf(stderr,"cp_rf occur error : %s\r\n",e.what());
+            iret = -1;
+        }
+    }
+    lua_pushinteger(L,iret);
+    return 1;
 }
 
 
