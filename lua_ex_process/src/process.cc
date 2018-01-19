@@ -3,6 +3,8 @@
 #include <math.h>
 #include "uv.h"
 
+using namespace std;
+
 static int64_t process_exit_status = -1;
 void on_exit(uv_process_t *req, int64_t exit_status, int term_signal)
 {
@@ -16,16 +18,17 @@ static int kill_by_name(lua_State *L)
     uv_loop_t* loop = uv_default_loop();
     uv_process_t child_req;
 
-    const char* process_file_name = luaL_checkstring(L,1);
+    //const char* process_file_name = luaL_checkstring(L,1);
 
     char* cmd_name = (char*)"taskkill";
 
-    char* args[3];
+    char* args[5];
     args[0] = cmd_name;
     args[1] = (char*)"/im";
-    args[2] = (char*)process_file_name;//(char*)"FSMachineVision_64WT.exe";
+    args[2] = (char*)"FSMachineVision_64WT.exe";
     args[3] = (char*)"-f";
     args[4] = NULL;
+
 
     uv_process_options_t options = {0}; // If change options to a local variable, remember to initialize it to null out all unused fields:
     options.exit_cb = on_exit;
@@ -44,8 +47,17 @@ static int kill_by_name(lua_State *L)
     }
 
     iret = uv_run(loop, UV_RUN_DEFAULT);
+    if(process_exit_status == 128){
+        //没有该名称的进程
+        iret = 1;
+    }
     lua_pushnumber(L, iret);
     return 1;
+}
+
+static int exec(lua_State *L)
+{
+    return 0;
 }
 
 static int my_math_sin (lua_State *L) {
