@@ -24,8 +24,9 @@ using namespace std;
 #endif
 
 typedef struct compressed_data_s{
-    unsigned str_size;
-    ulong buf_size; //重点：2018.01.20 教训 ： buf_size一定要申明为ulong 是8byte长度，如果你申明为unsingend,默认为4byte，所以zlib一直返回-5错误（BUF_ERROR）
+    //重点：2018.01.20 教训 ： buf_size和str_size一定要申明为ulong 是8byte长度，如果你申明为unsingend,默认为4byte，所以zlib一直返回-5错误（BUF_ERROR）
+    ulong str_size; //有些网络blog上用unsigned int，其在32位编译器下是没有问题的，但用于64位编译器调用zlib的compress&uncompress就要出现BUF_ERROR了。
+    ulong buf_size;
     char data[];// 柔性数组
 }compressed_data_t;
 
@@ -42,12 +43,12 @@ bool compressString(const char* str,compressed_data_t* pdata)
         printf("compress failed, error code:%d\n", res);
         return false;
     }
-    printf("string size %d, buffer size: %d\n", pdata->str_size, pdata->buf_size);
+    //printf("string size %d, buffer size: %d\n", pdata->str_size, pdata->buf_size);
 
     return true;
 }
 
-bool decompressString(compressed_data_t* pdata, char* str)
+bool uncompressString(compressed_data_t* pdata, char* str)
 {
     printf("string size %d, buffer size: %d\n", pdata->str_size, pdata->buf_size);
     int res = uncompress((Bytef*)str, (unsigned long *)&(pdata->str_size), (const Bytef *)pdata->data, (unsigned long)pdata->buf_size);
@@ -61,7 +62,7 @@ bool decompressString(compressed_data_t* pdata, char* str)
     return true;
 }
 
-static int decompress_string(lua_State* L)
+static int uncompress_string(lua_State* L)
 {
     const char *strBuf = lua_tostring(L, 1);
     compressed_data_t* pdata = (compressed_data_t*)strBuf;
@@ -94,13 +95,6 @@ static int compress_string(lua_State *L)
         lua_pushlstring(L, (char*)pdata, pdata->buf_size + sizeof(compressed_data_t));
         //printf("sizeof=%d", sizeof(compressed_data_t));
 
-        char* str = (char*)malloc(pdata->str_size * sizeof(char));
-        if(decompressString(pdata, str)){
-
-        }else{
-            printf("decompressString occur error\n");
-        }
-
     }else{
         lua_pushstring(L, "");
     }
@@ -111,7 +105,7 @@ static int compress_string(lua_State *L)
 static const struct luaL_Reg myLib[] =
 {
     {"compress_string", compress_string},
-    {"decompress_string",decompress_string},
+    {"uncompress_string",uncompress_string},
     {NULL, NULL}       //数组中最后一对必须是{NULL, NULL}，用来表示结束
 };
 
