@@ -81,6 +81,7 @@ win32: {
     #2018.01.19 QMAKE_POST_LINK对分割符有要求，windows用 "\\",linux用"/"
     QMAKE_POST_LINK +=  $${QMAKE_COPY_DIR} ..\\_lib\\windows $$DESTDIR & \
                         $${QMAKE_COPY_DIR} ..\\_lib\\windows\\$$CONFIGURATION $$DESTDIR & \
+                        $${QMAKE_COPY_DIR} media $$DESTDIR & \
                         $${QMAKE_COPY_DIR} media\\config $$DESTDIR\\config\\ & \
 #                        $${QMAKE_COPY_DIR} media\\process_icons ..\\_bin\\$$CONFIGURATION\\$$PLATFORM\\process_icons\\ & \
 #                        $${QMAKE_COPY_DIR} media\\examples ..\\_bin\\$$CONFIGURATION\\$$PLATFORM\\examples\\ & \
@@ -95,6 +96,9 @@ win32: {
 linux: {
     INCLUDEPATH += $$PWD/../_lib/boost_1_66_0/include
     LIBS += -L$$PWD/../_lib/boost_1_66_0/lib -lboost_system -lboost_filesystem
+
+    #2018.01.19 QMAKE_POST_LINK对分割符有要求，windows用 "\\",linux用"/"
+    QMAKE_POST_LINK +=  $${QMAKE_COPY_FILE} media/* $$DESTDIR & \
 }
 #加入通用lib支持
 

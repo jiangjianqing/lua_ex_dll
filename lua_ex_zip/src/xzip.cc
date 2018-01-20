@@ -70,7 +70,7 @@ static int uncompress_string(lua_State* L)
     unsigned blen = pdata->buf_size;
 
     char* str = (char*)malloc(pdata->str_size * sizeof(char));
-    if(decompressString(pdata, str)){
+    if(uncompressString(pdata, str)){
         lua_pushlstring(L, str, slen);
     }else{
         lua_pushstring(L, "");
