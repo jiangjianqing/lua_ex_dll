@@ -20,55 +20,9 @@ using namespace std;
 
 //命令行最大参数个数
 #define MAX_ARG_COUNT 100
-
-
-/**
- * @brief get_args
- * @param cmd 指令字符串 注：目前不支持 管道 操作
- * @param args 生成分割好的字符串列表，由外部分配好内存
- * @return
- */
-int get_args(const char* cmd , char** args)
-{
-
-    char *token = NULL;
-
-    char delim[] = " ,!";
-    int count = 0;
-
-#if defined(__linux__)
-// Linux系统 使用效率更高的strsep
-    char* buf = strdup(cmd);//复制一份cmd作为buf，后面用strsep会修改该值
-    for(token = strsep(&buf, delim); token != NULL; token = strsep(&buf, delim)) {
-        //One difference between strsep and strtok_r is that if the input string contains more
-        //than one character from delimiter in a row strsep returns an empty string for each
-        //pair of characters from delimiter. This means that a program normally should test
-        //for strsep returning an empty string before processing it.
-        if(token != NULL && strlen(token) == 0){
-            continue;
-        }
-        args[count] = token;//strdup(token);
-        count++;
-        printf(token);
-        printf("+");
-    }
-
-#elif defined(_WIN32)
-// Windows vc 没有strsep，所以任然使用strtok代替
-//#define LUA_API extern "C" __declspec(dllexport)
-    char* buf = (char*)cmd;
-    for(token = strtok(buf, delim); token != NULL; token = strtok(NULL, delim)) {
-        args[count] = token;//strdup(token);
-        printf(token);
-        printf("+");
-        count++;
-    }
+#ifndef MAX_PATH
+#define MAX_PATH 255
 #endif
-
-    args[count] = NULL;
-
-    return count;
-}
 
 static int rm_rf(lua_State *L)
 {
