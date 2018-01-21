@@ -86,6 +86,21 @@ static int cp_rf(lua_State *L)
     return 1;
 }
 
+static int mkdirp(lua_State *L)
+{
+    const char* dest = luaL_checkstring(L,1);
+    bool bret = false;
+    fprintf(stdout,"mkdirp dest : %s\n",dest);
+    if(exists(dest)){
+        if(is_directory(dest)){
+            bret = true;
+        }
+    }else{
+        bret = create_directories(dest);
+    }
+    lua_pushboolean(L,bret);
+    return 1;
+}
 
 static int my_math_sin (lua_State *L) {
     lua_pushnumber(L, sin(luaL_checknumber(L, 1)));
@@ -123,6 +138,7 @@ static const struct luaL_Reg myLib[] =
 {
     {"rm_rf", rm_rf},
     {"cp_rf", cp_rf},
+    {"mkdirp",mkdirp},
     {"average", averageFunc},
     {"sayHello", sayHelloFunc},
     {"my_cos",   my_math_cos},
