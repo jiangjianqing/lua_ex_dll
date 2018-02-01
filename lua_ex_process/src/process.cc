@@ -23,7 +23,7 @@ using namespace std;
 //命令行最大参数个数
 #define MAX_ARG_COUNT 100
 #ifndef MAX_PATH
-#define MAX_PATH 255
+#define MAX_PATH 260
 #endif
 
 static int64_t process_exit_status = -1;
@@ -46,14 +46,15 @@ int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
     options.args = (char**)args;
     options.file = args[0]; //特别注意：file和args的第一个参数相同
     char cwd[MAX_PATH] = {0};
-    options.cwd = cwd;//strdup(tmp.c_str());
+    //options.cwd = cwd;//注：如果这里设置了cwd，则会找不到taskkill等系统命令
 
-    path myfile(options.file);  //vc2015 std::tr2::sys::path
-    if (exists(myfile)) {
+    path myfile(options.file);
+    if (exists(myfile)) {//重要：能够找到文件，才需要设置options.cwd
         //printf(myfile.path.c_str());
         string tmp = myfile.parent_path().string();
         //strdupa 在stack上分配，离开{}就会被释放；strdup在堆上分配，需要free，所以使用memcpy
         memcpy(cwd,tmp.c_str(),strlen(tmp.c_str())+1);//options.cwd = strdup(tmp.c_str()); memory leak
+        options.cwd = cwd;//strdup(tmp.c_str());//重要
         printf(tmp.c_str());
     }
     if(!is_sync_exec){//注：异步执行时让child_process和parent detach
