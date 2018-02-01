@@ -28,12 +28,14 @@ void on_exit(uv_process_t *req, int64_t exit_status, int term_signal)
 {
     process_exit_status = exit_status;
     fprintf(stderr, "Process exited with status %d, signal %d\n", exit_status, term_signal);
-    uv_close((uv_handle_t*) req, NULL);
+    uv_close((uv_handle_t*) req, nullptr);
 }
 
 int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
 {
-    uv_loop_t* loop = uv_default_loop();
+    //uv_loop_t* loop = uv_default_loop();
+    uv_loop_t loop;
+    uv_loop_init(&loop);
     uv_process_t child_req;
 
     uv_process_options_t options = {0}; // If change options to a local variable, remember to initialize it to null out all unused fields:
@@ -51,10 +53,11 @@ int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
     }
     if(!is_sync_exec){//注：异步执行时让child_process和parent detach
         options.flags = UV_PROCESS_DETACHED;
+        options.exit_cb = nullptr;
     }
 
     int iret = 0;
-    iret = uv_spawn(loop,&child_req, &options);
+    iret = uv_spawn(&loop,&child_req, &options);
 
     if (iret) {
         fprintf(stderr, "%s\n", uv_strerror(iret));
@@ -65,13 +68,18 @@ int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
     }
 
     if(!is_sync_exec){
-        uv_run(loop, UV_RUN_NOWAIT);
+        uv_unref((uv_handle_t*) &child_req);//handle会始终监视着子进程，所以你的程序不会退出。uv_unref()会解除handle。
+        iret = uv_run(&loop, UV_RUN_NOWAIT);
+        uv_close((uv_handle_t*) &child_req, nullptr);
+        uv_loop_close(&loop);
+        //;
         //thread t{[&loop](){//obsoloted : 用thread异步不好，改用 UV_RUN_NOWAIT + options.flags = UV_PROCESS_DETACHED
 
         //}};
 
     }else{//sync exec
-        iret = uv_run(loop, UV_RUN_DEFAULT);
+        iret = uv_run(&loop, UV_RUN_DEFAULT);
+        uv_loop_close(&loop);
         if(process_exit_status == 128){
             //没有该名称的进程
             iret = -1;
