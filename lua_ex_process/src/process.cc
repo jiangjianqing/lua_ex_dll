@@ -22,6 +22,9 @@ using namespace std;
 
 //命令行最大参数个数
 #define MAX_ARG_COUNT 100
+#ifndef MAX_PATH
+#define MAX_PATH 255
+#endif
 
 static int64_t process_exit_status = -1;
 void on_exit(uv_process_t *req, int64_t exit_status, int term_signal)
@@ -42,13 +45,15 @@ int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
     options.exit_cb = exit_cb;
     options.args = (char**)args;
     options.file = args[0]; //特别注意：file和args的第一个参数相同
+    char cwd[MAX_PATH] = {0};
+    options.cwd = cwd;//strdup(tmp.c_str());
 
     path myfile(options.file);  //vc2015 std::tr2::sys::path
     if (exists(myfile)) {
         //printf(myfile.path.c_str());
-
         string tmp = myfile.parent_path().string();
-        options.cwd = strdup(tmp.c_str());
+        //strdupa 在stack上分配，离开{}就会被释放；strdup在堆上分配，需要free，所以使用memcpy
+        memcpy(cwd,tmp.c_str(),strlen(tmp.c_str())+1);//options.cwd = strdup(tmp.c_str()); memory leak
         printf(tmp.c_str());
     }
     if(!is_sync_exec){//注：异步执行时让child_process和parent detach
@@ -96,7 +101,7 @@ int exec_shell(const char** args,uv_exit_cb exit_cb,bool is_sync_exec)
  * @param args 生成分割好的字符串列表，由外部分配好内存
  * @return
  */
-int get_args(const char* cmd , char** args)
+int splite(const char* cmd , char** args)
 {
 
     char *token = NULL;
@@ -106,7 +111,8 @@ int get_args(const char* cmd , char** args)
 
 #if defined(__linux__)
 // Linux系统 使用效率更高的strsep
-    char* buf = strdup(cmd);//复制一份cmd作为buf，后面用strsep会修改该值
+    char* buf = strdup(cmd);//memory leak!!forget invoke free!! 复制一份cmd作为buf，后面用strsep会修改该值,用strdup
+    fprintf(stderr, "Warning: in file [%s , %d],func [splite] invoke strdup ,  memory leak in linux\n",__FILE__,__LINE__);
     for(token = strsep(&buf, delim); token != NULL; token = strsep(&buf, delim)) {
         //One difference between strsep and strtok_r is that if the input string contains more
         //than one character from delimiter in a row strsep returns an empty string for each
@@ -162,7 +168,7 @@ static int kill_by_name(lua_State *L)
     //强制杀死PID为processid的进程，PID可通过tasklist查看
     //taskkill /pid processid -f
 #endif
-    get_args(cmd_buf,args);
+    splite(cmd_buf,args);
 
     int iret = exec_shell((const char**)args,on_exit,true);
 
@@ -174,7 +180,7 @@ static int exec(lua_State *L)
 {
     const char* cmd = luaL_checkstring(L,1);
     char* args[MAX_ARG_COUNT] = {0};
-    get_args(cmd , args);
+    splite(cmd , args);
 
     int iret = exec_shell((const char**)args,on_exit,true);
     lua_pushnumber(L , iret);
@@ -185,7 +191,7 @@ static int async_exec(lua_State *L)
 {
     const char* cmd = luaL_checkstring(L,1);
     char* args[MAX_ARG_COUNT] = {0};
-    get_args(cmd , args);
+    splite(cmd , args);
 
     int iret = exec_shell((const char**)args,on_exit,false);
     lua_pushnumber(L , iret);
