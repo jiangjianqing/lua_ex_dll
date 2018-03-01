@@ -24,12 +24,35 @@ using namespace std;
 #define MAX_PATH 255
 #endif
 
+#ifdef _MSC_VER
+//windows + vc2015 进行string和wstring进行转换的转换类定义
+static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> w_s_converter;
+#else
+//linux + gcc 进行string 和wstring进行转换的转换类定义
+static std::wstring_convert<std::codecvt_utf8<wchar_t>> w_s_converter;
+#endif
+
+string ws2s(const wstring& wstr)
+{
+    return w_s_converter.to_bytes(wstr);
+}
+
+wstring s2ws(const string& str)
+{
+    return w_s_converter.from_bytes(str);
+}
+
 static int rm_rf(lua_State *L)
 {
     const char* dirname = luaL_checkstring(L,1);
     uintmax_t iret = 0;
     try{
+#if defined(__linux__)
         iret = remove_all(dirname);
+#elif defined(_WIN32)
+        iret = remove_all(s2ws(dirname));
+#endif
+
     }catch(const exception& e){
         fprintf(stderr,"rm_rf occur error : %s\r\n",e.what());
         iret = -1;
@@ -73,13 +96,22 @@ static int cp_rf(lua_State *L)
     const char* source = luaL_checkstring(L,1);
     const char* dest = luaL_checkstring(L,2);
     fprintf(stdout,"source = %s , dest = %s \r\n",source,dest);
-    int iret = 0;
+    int iret = -2;//不存在
+#if defined(__linux__)
     if(exists(source)){
+#elif defined(_WIN32)
+    if(exists(s2ws(source))){
+#endif
         try{
+#if defined(__linux__)
             CopyFiles(source,dest);
+#elif defined(_WIN32)
+            CopyFiles(s2ws(source), s2ws(dest));
+            iret = 0;
+#endif
         }catch(const filesystem_error& e){
             fprintf(stderr,"cp_rf occur error : %s\r\n",e.what());
-            iret = -1;
+            iret = -1;//出错
         }
     }
     lua_pushinteger(L,iret);
@@ -91,12 +123,17 @@ static int mkdirp(lua_State *L)
     const char* dest = luaL_checkstring(L,1);
     bool bret = false;
     fprintf(stdout,"mkdirp dest : %s\n",dest);
-    if(exists(dest)){
-        if(is_directory(dest)){
+#if defined(__linux__)
+    path destPath(dest);
+#elif defined(_WIN32)
+    path destPath(s2ws(dest));
+#endif
+    if(exists(destPath)){
+        if(is_directory(destPath)){
             bret = true;
         }
     }else{
-        bret = create_directories(dest);
+        bret = create_directories(destPath);
     }
     lua_pushboolean(L,bret);
     return 1;
